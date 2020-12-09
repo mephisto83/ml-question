@@ -23,8 +23,16 @@ class Node:
             return True
         if self.token_type == TokenType.T_INTEGRAL:
             return True
+        if self.token_type == TokenType.T_VARIABLE:
+            return True
+        if self.token_type == TokenType.T_NUM:
+            return True
         if self.token_type == TokenType.S_DELIMITER:
             return self.contextType == TokenType.T_INTEGRAL
+        if self.token_type == TokenType.S_VERTICAL:
+            return True
+        if self.token_type == TokenType.T_POWER:
+            return True
         return False
     def hasChildren(self):
         if self.token_type == TokenType.S_GROUP:
@@ -52,10 +60,22 @@ class Node:
         return False
     def isLexicalContextChanging(self):
         return self.token_type == TokenType.T_INTEGRAL
-    def isDelimeter(self):
+    def lookAhead(self):
+        builder = LexicalBuilderRule.getTypeRule(self.token_type, self)
+        return builder.isNextRuleBeforeSelf(self)
+    def lookBehind(self):
+        builder = LexicalBuilderRule.getTypeRule(self.token_type, self)
+        return builder.isNextRuleAfterSelf(self)
+    def isDelimiter(self):
         return self.token_type == TokenType.T_LPAR or self.token_type == TokenType.T_RPAR
     def isOpeningDelimeter(self):
         return self.token_type == TokenType.T_LPAR
+    def peekStack(self, stack):
+        if len(stack) > 0:
+            return stack[-1]['ln']
+        return None
+    def isClosingDelimiter(self):
+        return self.token_type == TokenType.T_RPAR
     def isOperator(self):
         return self.tokenIsSimple() or self.isExpression() or self.isFunction()
     def isFunction(self):
@@ -90,6 +110,8 @@ class Node:
             return True
         if token_type == TokenType.T_PLUS:
             return True
+        if token_type == TokenType.T_POWER:
+            return True
         return False   
     def setSatisfyingNode(self, _part):
         self.satisfyingNode = _part
@@ -97,6 +119,8 @@ class Node:
         self.token_type = type_
     def getTokenType(self):
         return self.token_type
+    def isGreedy(self):
+        return self.token_type == TokenType.S_VERTICAL
     def changeChildKey(self, name, to):
         if self.hasChild(name):
             self.addChild(to, self.getChild(name))

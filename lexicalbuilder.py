@@ -5,7 +5,9 @@ from node import Node
 import re
 from lexicalbuilderrules import LexicalBuilderRule
 from lexicalruleitem import LexicalRuleItem
-
+class MockGroup:
+    def __init__(self, list_):
+        self.nodelist = list_
 class LexicalBuilder:
     def __init__(self):
         self.state = None
@@ -21,28 +23,13 @@ class LexicalBuilder:
             # while remaining == None or len(remaining) > 0:
             remaining, currentNode = self.produceNodeFromString(text, stack_context)
             text = "".join(remaining)
-            if currentNode.isClosingSelf():
-                pass
-            elif lastNode == None:
-                lastNode = currentNode
-            else:
-                parsedNode = self.parse(currentNode, lastNode)
-                lastNode = currentNode
-                currentNode = parsedNode
             return currentNode, text
         elif isinstance(latexNode, LatexMacroNode):
             currentNode = self.produceNodeFromMacro(latexNode)
-            if lastNode != None:
-                return self.parse(currentNode, lastNode), ""
-            else:
-                return currentNode, ""
+            return currentNode, ""
         elif isinstance(latexNode, LatexGroupNode):
             currentNode = self.produceNodeGroupGroup(latexNode)
-            if lastNode != None:
-                return self.parse(currentNode, lastNode), ""
-            else:
-                return currentNode, ""
-
+            return self.parse(currentNode, lastNode), ""
         return currentNode, ""
 
     def produceNodeFromMacro(self, latexNode):
@@ -77,8 +64,9 @@ class LexicalBuilder:
             '/': TokenType.T_DIV,
             '(': TokenType.T_LPAR,
             ')': TokenType.T_RPAR,
-            '_': TokenType.S_DELIMITER,
-            '^': TokenType.T_POWER
+            '_': TokenType.S_VERTICAL,
+            '^': TokenType.T_POWER,
+            ' ': TokenType.S_SPACE
         }
         letters = list("abcdefghijklmnopqrstuvwxyz")
         token_type = None
@@ -137,11 +125,6 @@ class LexicalBuilder:
         if True:
             builder = LexicalBuilderRule.getTypeRule(
                 currentNode.getTokenType())
-            rule = builder.getNextMissing(currentNode)
-            if rule == LexicalRuleItem.K_RANGE:
-                if lastNode.getTokenType() != TokenType.T_RANGE:
-                    genericRange = Node(TokenType.T_RANGE)
-                    builder.consume(currentNode, genericRange)
 
             builder.consume(currentNode, lastNode)
             return currentNode
@@ -162,11 +145,20 @@ class LexicalBuilder:
     def handleVariable(self, currentNode, lastNode=None):
         if lastNode != None:
             if lastNode.getTokenType() == TokenType.T_DELTA:
-                return self.handleDelta(currentNode, lastNode)
+                return self.handleDelta( lastNode, currentNode)
+            elif lastNode.getTokenType() == TokenType.S_VERTICAL:
+                return self.handleVertical(currentNode, lastNode)
 
         return self.handleNumber(currentNode, lastNode)
-
-    def handleDelta(self, node, deltaNode):
+    def handleVertical(self, node, verticalNode):
+        if verticalNode.getTokenType() == TokenType.S_VERTICAL:
+            builder = LexicalBuilderRule.getTypeRule(verticalNode.getTokenType())
+            if builder.isFull(verticalNode):
+                return self.parse(node, verticalNode)
+            else:
+                builder.consume(verticalNode, node)
+            return verticalNode
+    def handleDelta(self, deltaNode, node):
         if deltaNode.getTokenType() == TokenType.T_DELTA:
             builder = LexicalBuilderRule.getTypeRule(deltaNode.getTokenType())
             if builder.isFull(deltaNode):
@@ -212,7 +204,7 @@ class LexicalBuilder:
             return self.handleNumber(currentNode, lastNode)
         elif token_type == TokenType.T_VARIABLE:
             return self.handleVariable(currentNode, lastNode)
-        elif currentNode.isDelimeter():
+        elif currentNode.isDelimiter():
             return currentNode
         elif currentNode.isExpression():
             return self.handleExpression(currentNode, lastNode)
@@ -224,16 +216,25 @@ class LexicalBuilder:
             return self.handleGroup(currentNode, lastNode)
         elif currentNode.isFunction():
             return self.handleFunction(currentNode, lastNode)
+        elif currentNode.getTokenType() == TokenType.S_VERTICAL:
+            return self.handleVertical(lastNode, currentNode)
+        elif currentNode.getTokenType() == TokenType.T_INTEGRAL:
+            return self.handleIntegral(currentNode, lastNode)
         raise Exception("unhandled parse case  : " + str(token_type))
+
+    def handleIntegral(self, currentNode, lastNode):
+        builder = LexicalBuilderRule.getTypeRule(lastNode.getTokenType())
+        builder.consume(currentNode, lastNode)
+        return currentNode
 
     def handleGroup(self, currentNode, lastNode):
         if currentNode.hasChildren():
             groupContent = self.buildTree(currentNode.groupLatex)
-            newNode = self.parse(groupContent, lastNode)
-            return newNode
+            return groupContent
         # just return itself, cause it will have to drill down inside.
         return currentNode
-
+    def buildGroup(self, nodeList):
+        return self.buildTree(MockGroup(nodeList))
     def buildTree(self, node):
         return self.eqBuilder.buildTree(node)
 
@@ -258,14 +259,6 @@ class LexicalBuilder:
         s_list[:] = s
         for i in range(len(s_list)):
             c = s_list[i]
-            if c == ' ':
-                if stack_context != None:
-                    if stack_context.closesWith(' '):
-                        if last_type == None:
-                            return s_list[i+1:], Node.closeSelf()
-                        if last_type != token_type:
-                            return s_list[i:], lastNode
-                continue
             token_type = self.getTokenType(c)
             currentNode = Node(token_type, c)
 

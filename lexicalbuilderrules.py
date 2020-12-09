@@ -19,6 +19,8 @@ def opSort(e):
         return 3
     elif tt == TokenType.T_MINUS:
         return 3
+    elif tt == TokenType.T_INTEGRAL:
+        return 1
     raise Exception("unhandled opSort")
 
 
@@ -26,11 +28,12 @@ class LexicalBuilderRule:
     def __init__(self):
         self.expectedItemOrder = []
         self.requiredItems = []
-    
+
     @staticmethod
     def isNodeFull(node):
         builder = LexicalBuilderRule.getTypeRule(node.getTokenType())
         return builder.isFull(node)
+
     def isFull(self, node):
         nextMissing = self.getNextMissing(node)
         return nextMissing == None
@@ -46,6 +49,22 @@ class LexicalBuilderRule:
             if not node.hasChild(i) and i != LexicalRuleItem.K_SELF:
                 return i
         return None
+
+    def isNextRuleBeforeSelf(self, node):
+        for i in self.expectedItemOrder:
+            if not node.hasChild(i) and i != LexicalRuleItem.K_SELF:
+                return True
+            elif i == LexicalRuleItem.K_SELF:
+                return False
+        return False
+
+    def isNextRuleAfterSelf(self, node):
+        for i in self.expectedItemOrder[::-1]:
+            if not node.hasChild(i) and i != LexicalRuleItem.K_SELF:
+                return True
+            elif i == LexicalRuleItem.K_SELF:
+                return False
+        return False
 
     def sortOperations(self, operations):
         array = []
@@ -85,32 +104,49 @@ class LexicalBuilderRule:
             return LexicalBuilderRule.empty()
         elif typeRule == TokenType.T_NUM:
             return LexicalBuilderRule.empty()
+        elif typeRule == TokenType.S_SPACE:
+            return LexicalBuilderRule.empty()
         elif typeRule == TokenType.T_INTEGRAL:
             return LexicalBuilderRule.integralExpression()
         elif typeRule == TokenType.S_DELIMITER:
             return LexicalBuilderRule.delimiter(context)
         elif typeRule == TokenType.S_GROUP:
             return LexicalBuilderRule.group()
+        elif typeRule == TokenType.S_VERTICAL:
+            return LexicalBuilderRule.verticalRule()
         else:
             raise Exception("not handled getTypeRule : " + str(typeRule))
-    @staticmethod 
+    @staticmethod
+    def verticalRule():
+        result = LexicalBuilderRule()
+        result.expectedItemOrder = [
+            LexicalRuleItem.K_SELF, LexicalRuleItem.K_START, LexicalRuleItem.K_POWER, LexicalRuleItem.K_END]
+        result.requiredItems = [
+            LexicalRuleItem.K_SELF, LexicalRuleItem.K_START, LexicalRuleItem.K_POWER, LexicalRuleItem.K_END]
+        return result
+
+    @staticmethod
     def delimiter(context):
         if context == None:
             raise Exception("context cant be none for delimiter")
         if TokenType.T_RANGE in context.potentials:
             return LexicalBuilderRule.rangeExpression()
+
     @staticmethod
     def rangeExpression():
         result = LexicalBuilderRule()
-        result.expectedItemOrder = [LexicalRuleItem.K_START, LexicalRuleItem.K_END]
+        result.expectedItemOrder = [
+            LexicalRuleItem.K_START, LexicalRuleItem.K_END]
         result.requiredItems = [LexicalRuleItem.K_START, LexicalRuleItem.K_END]
         return result
+
     @staticmethod
     def group():
         result = LexicalBuilderRule()
         result.expectedItemOrder = [LexicalRuleItem.K_PARAM1]
         result.requiredItems = [LexicalRuleItem.K_PARAM1]
         return result
+
     @staticmethod
     def getNextExpectedNodeType(typeRule, context=None, params=None):
         if typeRule == TokenType.S_DELIMITER:
@@ -132,6 +168,7 @@ class LexicalBuilderRule:
                 if i != TokenType.T_DELTA:
                     res.append(i)
             return res
+
     @staticmethod
     def getNodesNextRule(node):
         builder = LexicalBuilderRule.getTypeRule(node.getTokenType())
@@ -152,6 +189,7 @@ class LexicalBuilderRule:
     @staticmethod
     def powerRule():
         return LexicalBuilderRule.simpleRule()
+
     @staticmethod
     def subtractRule():
         return LexicalBuilderRule.simpleRule()
@@ -169,9 +207,9 @@ class LexicalBuilderRule:
     def simpleExpression():
         result = LexicalBuilderRule()
         result.expectedItemOrder = [
-            LexicalRuleItem.K_PARAM1, LexicalRuleItem.K_SELF]
+            LexicalRuleItem.K_SELF, LexicalRuleItem.K_PARAM1]
         result.requiredItems = [
-            LexicalRuleItem.K_PARAM1, LexicalRuleItem.K_SELF]
+            LexicalRuleItem.K_SELF, LexicalRuleItem.K_PARAM1]
         return result
 
     @staticmethod
@@ -185,16 +223,16 @@ class LexicalBuilderRule:
     def deltaExpression():
         result = LexicalBuilderRule()
         result.expectedItemOrder = [
-            LexicalRuleItem.K_WITH_RESPECT, LexicalRuleItem.K_SELF]
+            LexicalRuleItem.K_SELF, LexicalRuleItem.K_WITH_RESPECT]
         result.requiredItems = [
-            LexicalRuleItem.K_WITH_RESPECT, LexicalRuleItem.K_SELF]
+            LexicalRuleItem.K_SELF, LexicalRuleItem.K_WITH_RESPECT]
         return result
 
     @staticmethod
     def integralExpression():
         result = LexicalBuilderRule()
         result.expectedItemOrder = [
-            LexicalRuleItem.K_RANGE, LexicalRuleItem.K_SELF, LexicalRuleItem.K_MIDDLE, LexicalRuleItem.K_DELTA]
+            LexicalRuleItem.K_SELF, LexicalRuleItem.K_RANGE,  LexicalRuleItem.K_MIDDLE, LexicalRuleItem.K_DELTA]
         result.requiredItems = [
-            LexicalRuleItem.K_RANGE, LexicalRuleItem.K_SELF, LexicalRuleItem.K_MIDDLE, LexicalRuleItem.K_DELTA]
+            LexicalRuleItem.K_SELF, LexicalRuleItem.K_RANGE, LexicalRuleItem.K_MIDDLE, LexicalRuleItem.K_DELTA]
         return result

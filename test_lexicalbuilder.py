@@ -40,10 +40,10 @@ class TestEquationData(unittest.TestCase):
         remaingString, lastNode = data.produceNodeFromString('54+4-4')
         self.assertEqual(len(remaingString), 4, "there should be more string left")
         self.assertEqual(lastNode.getTokenType(), TokenType.T_NUM, "The node should be a number")
-    def test_54plus4minus4_ignorespace(self):
+    def test_54plus4minus4_DONTignorespace(self):
         data = LexicalBuilder()
         remaingString, lastNode = data.produceNodeFromString('54 + 4-4')
-        self.assertEqual(len(remaingString), 5, "there should be more string left")
+        self.assertEqual(len(remaingString), 6, "there should be more string left")
         self.assertEqual(lastNode.getTokenType(), TokenType.T_NUM, "The node should be a number")
     def test_justplust_(self):
         data = LexicalBuilder()

@@ -11,3 +11,4 @@ class LexicalRuleItem(enum.Enum):
     K_RANGE = 7
     K_END = 8
     K_START = 9
+    K_POWER = 10

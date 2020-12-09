@@ -21,6 +21,8 @@ class TokenType(enum.Enum):
     T_ROOT = 17
     T_VARIABLE = 18
     T_DELTA = 19
+    S_VERTICAL = 20
+    S_SPACE = 21
 
 class MacroTypes(enum.Enum):
     Times = "times"

@@ -68,12 +68,19 @@ class EquationData:
                     return self._findMathNode(node.nodelist[i])
         return None
 
+    def addToStack(self, stack, previousNode, currentNode):
+        if currentNode == None:
+            raise Exception("current node cant be none")
+        stack.append({'pn': previousNode, 'ln': currentNode})
+
     def buildTree(self, mathNode):
         if mathNode == None:
             raise Exception("math node is none, buildTree")
         currentNode = None
         previousNode = None
         stack = []
+        opened = None
+        opened_list = []
         for i in range(len(mathNode.nodelist)):
             nextNode = self.getNodeAt(mathNode, i)
             remaining = None
@@ -81,69 +88,99 @@ class EquationData:
                 stack_context = self.getStackContext(stack)
                 currentNode, remaining = self.buildNode(
                     nextNode, currentNode, remaining, stack_context)
-                if currentNode.isClosingSelf():
-                    topNode = stack[-1]
-                    pn = topNode['pn']
-                    ln = topNode['ln']
-                    if LexicalBuilderRule.isNodeFull(previousNode):
-                        nodeForPrevious = self.satifyNode(ln, previousNode)
-                        stack.pop()
-                        topNode = stack[-1]
-                        pn = topNode['pn']
-                        ln = topNode['ln']
-                        if ln == None:
-                            pass
-                        elif ln.isOperator():
-                            currentNode = self.lexicalBuilder.parse(
-                                ln, nodeForPrevious)
-                        else:
-                            currentNode = self.lexicalBuilder.buildContextualMultiply(
-                                nodeForPrevious, ln)
-                        if not LexicalBuilderRule.isNodeFull(currentNode):
-                            selfClosingNode = self.createNewSelfClosing(currentNode)
-                            stack.append({'pn': currentNode, 'ln': selfClosingNode})
-                            currentNode = selfClosingNode
+            
+                if currentNode.isOpeningDelimeter():
+                    opened = True
+                    continue
+                if currentNode.isClosingDelimiter():
+                    opened = False
+                    currentNode = self.buildGroup(opened_list)
+                    opened_list = []
+                if opened:
+                    opened_list.append(nextNode)
+                    continue
+                if currentNode.getTokenType() == TokenType.S_SPACE:
+                    continue    
+                if len(stack) > 0:
+                    popStackAgain = True
+                    while popStackAgain:
+                        popStackAgain = False
+                        peekTop = self.peekStack(stack)
+                        if peekTop == None:
+                            self.addToStack(
+                                stack, previousNode, currentNode)
+                        elif peekTop.lookBehind():
+                            if currentNode.isClosing() or peekTop.isGreedy():
+                                if currentNode.isClosing():
+                                    currentNode = self.lexicalBuilder.parse(
+                                        peekTop, currentNode)
+                                elif peekTop.isGreedy():
+                                    currentNode = self.lexicalBuilder.parse(
+                                        peekTop, currentNode)
 
-                elif currentNode.isSelfClosing():
-                    if currentNode.isClosing():  # if the node has all the required inputs
-                        topNode = stack.pop()
-                        pn = topNode['pn']
-                        ln = topNode['ln']
-                        if pn == None:
-                            pass
-                        elif pn.isOperator():
-                            currentNode = self.lexicalBuilder.parse(pn, ln)
-                        else:
-                            currentNode = self.lexicalBuilder.buildContextualMultiply(
-                                ln, pn)
-                    else:
-                        stack.append({'pn': previousNode, 'ln': currentNode})
-                elif currentNode.isDelimeter():
-                    if currentNode.isOpeningDelimeter():
-                        stack.append({'pn': previousNode, 'ln': currentNode})
-                        currentNode = None
-                    else:
-                        topNode = stack.pop()
-                        pn = topNode['pn']
-                        ln = topNode['ln']
-                        if previousNode == None:
-                            raise Exception(
-                                "there shouldnt be an undefined middle to a context")
-                        contextNode = self.makeContextNode(
-                            ln, previousNode, currentNode)
-                        if pn == None:
-                            currentNode = contextNode
-                        elif pn.isOperator():
+                                self.restack(stack, currentNode)
+                                peekTop = self.peekStack(stack)
+                                if peekTop.isClosing():
+                                    popStackAgain = True
+                                    currentNode = self.peekStack(stack)
+                                    self.popStack(stack)
+                            else:
+                                self.addToStack(
+                                    stack, previousNode, currentNode)
+                        elif currentNode.lookAhead():
                             currentNode = self.lexicalBuilder.parse(
-                                pn, contextNode)
+                                currentNode, peekTop)
+                            self.restack(stack, currentNode)
+                            peekTop = self.peekStack(stack)
+                            if peekTop.isClosing():
+                                popStackAgain = True
+                                currentNode = self.peekStack(stack)
+                                self.popStack(stack)
                         else:
-                            currentNode = self.lexicalBuilder.buildContextualMultiply(
-                                contextNode, pn)
+                            self.addToStack(
+                                stack, previousNode, currentNode)
+                else:
+                    self.addToStack(stack, previousNode, currentNode)
+
                 previousNode = currentNode
         if len(stack) > 0:
-            raise Exception("stack should be empty on exit, equation data")
-
+            if len(stack) == 1:
+                return self.getClimbToRoot(currentNode)
+            currentNode = None
+            while len(stack) > 0:
+                stackItem = self.popStack(stack)
+                if currentNode == None:
+                    currentNode = stackItem['ln']
+                else:
+                    currentNode = self.lexicalBuilder.buildContextualMultiply(
+                        currentNode, stackItem['ln'])
         return self.getClimbToRoot(currentNode)
+
+    def buildContextualMultiplyFromStack(self, stack, node):
+        result = node
+        done = False
+        while not done:
+            done = True
+            if len(stack) > 0:
+                top = stack[-1]
+                lastNode = top['ln']
+
+    def peekStack(self, stack):
+        if len(stack) > 0:
+            return stack[-1]["ln"]
+        return None
+
+    def popStack(self, stack):
+        if len(stack) > 0:
+            return stack.pop()
+        raise Exception("cant pop an empty stack")
+
+    def restack(self, stack, node):
+        if len(stack) > 0:
+            stack[-1]['ln'] = node
+            return
+        raise Exception("cant restack if the stack is empty")
+
     def createNewSelfClosing(self, node):
         if node.getTokenType() == TokenType.T_INTEGRAL:
             result = Node(TokenType.S_DELIMITER)
@@ -210,7 +247,11 @@ class EquationData:
             self.lexicalBuilder = LexicalBuilder()
             self.lexicalBuilder.setEqBuilder(self)
         return self.lexicalBuilder.consume(node, previousNode, remainingText, stack_context)
-
+    def buildGroup(self, nodelist):
+        if self.lexicalBuilder == None:
+            self.lexicalBuilder = LexicalBuilder()
+            self.lexicalBuilder.setEqBuilder(self)
+        return self.lexicalBuilder.buildGroup(nodelist)
     def printLatexNodes(self, text):
         print("print " + text)
         w = LatexWalker(text)
