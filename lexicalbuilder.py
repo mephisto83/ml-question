@@ -66,7 +66,8 @@ class LexicalBuilder:
             ')': TokenType.T_RPAR,
             '_': TokenType.S_VERTICAL,
             '^': TokenType.T_POWER,
-            ' ': TokenType.S_SPACE
+            ' ': TokenType.S_SPACE,
+            '.': TokenType.T_NUM
         }
         letters = list("abcdefghijklmnopqrstuvwxyz")
         token_type = None
@@ -265,6 +266,10 @@ class LexicalBuilder:
             if token_type == TokenType.T_NUM:
                 if last_type == TokenType.T_NUM:
                     lastNode.merge(currentNode)
+                    currentNode = lastNode
+            elif token_type == TokenType.T_MINUS and lastNode == None and self.getTokenType(s_list[i+1]) == TokenType.T_NUM:
+                currentNode.changeTokenType(TokenType.T_NUM)
+                token_type = TokenType.T_NUM
             else:
                 if last_type == None:
                     return s_list[i+1:], currentNode

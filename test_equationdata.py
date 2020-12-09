@@ -196,7 +196,7 @@ class TestEquationData(unittest.TestCase):
         left = res.hasChild(LexicalRuleItem.K_PARAM1)
         self.assertTrue(left)
     def test_buildTree_3MINUS4X5(self):
-        data = EquationData(r"""\[3-4\times5\]""")
+        data = EquationData(r"""\[3 - 4\times5\]""")
         mathNode = data.findMathNode()
         res = data.buildTree(mathNode)
         self.assertIsNotNone(res, "Build node should return a node")
@@ -206,7 +206,7 @@ class TestEquationData(unittest.TestCase):
         self.assertTrue(left)
         self.assertTrue(right)
     def test_buildTree_3x4MINUS5(self):
-        data = EquationData(r"""\[3\times4-5\]""")
+        data = EquationData(r"""\[3 \times 4 - 5\]""")
         mathNode = data.findMathNode()
         res = data.buildTree(mathNode)
         self.assertIsNotNone(res, "Build node should return a node")
@@ -227,14 +227,14 @@ class TestEquationData(unittest.TestCase):
         self.assertTrue(right)
     
     def test_delta_with_respect(self): 
-        data = EquationData(r"""\[\{delta x}\]""")
+        data = EquationData(r"""\[{\delta x}\]""")
         mathNode = data.findMathNode()
         res = data.buildTree(mathNode)
         self.assertIsNotNone(res, "Build node should return a node")
         self.assertEqual(res.getTokenType(), TokenType.T_DELTA)
         left = res.hasChild(LexicalRuleItem.K_WITH_RESPECT)
         self.assertTrue(left)
-    def test_delta_with_respect(self): 
+    def test_delta_with_respect_times_y(self): 
         data = EquationData(r"""\[{\delta x}y\]""")
         mathNode = data.findMathNode()
         res = data.buildTree(mathNode)
@@ -268,7 +268,7 @@ class TestEquationData(unittest.TestCase):
         self.assertEqual(right.getTokenType(), TokenType.T_DELTA)
     
 
-    def test_integral_with_func(self):
+    def test_integral_with_func_2(self):
         data = EquationData(r"""\[\int_{a}^{b} {x^2}{\delta x}\]""")
         mathNode = data.findMathNode()
         res = data.buildTree(mathNode)
@@ -290,9 +290,9 @@ class TestEquationData(unittest.TestCase):
         res, remaining = data.buildNode(nextNode, None, None, None)
         node = Node(TokenType.S_VERTICAL)
         data.addToStack(stack, res, node)
-        self.assertTrue(node.isDelimiter(), "latex vertical is a delimeter")
+        self.assertFalse(node.isDelimiter(), "latex vertical is a delimeter")
 
-    def test_vertial_input_is_delimiter(self):
+    def test_vertial_input_is_delimiter_opening(self):
         data = EquationData(r"""\[\int_{a}^{b}{x^2}{\delta x}\]""")
         mathNode = data.findMathNode()
         stack = []
@@ -301,7 +301,7 @@ class TestEquationData(unittest.TestCase):
         nextNode = data.getNodeAt(mathNode, 1)
         node, remaining = data.buildNode(nextNode, None, None, None)
         data.addToStack(stack, res, node)
-        self.assertTrue(node.isOpeningDelimeter([], res), "latex vertical is an opening delimeter")
+        self.assertFalse(node.isOpeningDelimeter(), "latex vertical is an opening delimeter")
 
     def test_if_integral_is_full(self):
         data = EquationData(r"""\[\int_{a}^{b}{x^2}{\delta x}\]""")
@@ -312,7 +312,7 @@ class TestEquationData(unittest.TestCase):
         self.assertFalse(res.isClosing(), "latex vertical is an opening delimeter")
         
 
-    def test_vertial_input_is_delimiter(self):
+    def test_vertial_input_is_delimiter_(self):
         data = EquationData(r"""\[\int_{a}^{b}{x^2}{\delta x}\]""")
         mathNode = data.findMathNode()
         stack = []
@@ -369,5 +369,41 @@ class TestEquationData(unittest.TestCase):
         
         
  
+    def test_decimal(self):
+        data = EquationData(r"""\[1.1\]""")
+        mathNode = data.findMathNode()
+        res = data.buildTree(mathNode)
+        self.assertEqual(res.getTokenType(), TokenType.T_NUM)
+        self.assertEqual(res.value, '1.1')
+    def test_decimal1134(self):
+        data = EquationData(r"""\[1.134\]""")
+        mathNode = data.findMathNode()
+        res = data.buildTree(mathNode)
+        self.assertEqual(res.getTokenType(), TokenType.T_NUM)
+        self.assertEqual(res.value, '1.134')
+    def test_decimal11134(self):
+        data = EquationData(r"""\[11.134\]""")
+        mathNode = data.findMathNode()
+        res = data.buildTree(mathNode)
+        self.assertEqual(res.getTokenType(), TokenType.T_NUM)
+        self.assertEqual(res.value, '11.134')
+    def test_decimal134(self):
+        data = EquationData(r"""\[.134\]""")
+        mathNode = data.findMathNode()
+        res = data.buildTree(mathNode)
+        self.assertEqual(res.getTokenType(), TokenType.T_NUM)
+        self.assertEqual(res.value, '.134')
+    def test_decimal0134(self):
+        data = EquationData(r"""\[0.134\]""")
+        mathNode = data.findMathNode()
+        res = data.buildTree(mathNode)
+        self.assertEqual(res.getTokenType(), TokenType.T_NUM)
+        self.assertEqual(res.value, '0.134')
+    def test_negative(self):
+        data = EquationData(r"""\[-4\]""")
+        mathNode = data.findMathNode()
+        res = data.buildTree(mathNode)
+        self.assertEqual(res.getTokenType(), TokenType.T_NUM)
+        self.assertEqual(res.value, '-4')
 if __name__ == '__main__':
     unittest.main()
