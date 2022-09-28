@@ -114,8 +114,20 @@ class LexicalBuilderRule:
             return LexicalBuilderRule.group()
         elif typeRule == TokenType.S_VERTICAL:
             return LexicalBuilderRule.verticalRule()
+        elif typeRule == TokenType.T_CONTEXT:
+            return LexicalBuilderRule.contextRule()
         else:
             raise Exception("not handled getTypeRule : " + str(typeRule))
+
+    @staticmethod
+    def contextRule():
+        result = LexicalBuilderRule()
+        result.expectedItemOrder = [
+            LexicalRuleItem.K_MIDDLE]
+        result.requiredItems = [
+            LexicalRuleItem.K_MIDDLE]
+        return result
+
     @staticmethod
     def verticalRule():
         result = LexicalBuilderRule()

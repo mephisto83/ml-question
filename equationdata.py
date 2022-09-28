@@ -9,8 +9,15 @@ from lexicalruleitem import LexicalRuleItem
 
 class EquationData:
     def __init__(self, equation):
-        self.equation = equation
+        self.equation = EquationData.massageEquaton(equation)
         self.lexicalBuilder = None
+    @staticmethod
+    def massageEquaton(equation):
+        equation = equation.replace("(", "({")
+        equation = equation.replace("({{", "({")
+        equation = equation.replace(")", "})")
+        equation = equation.replace("}})", "})")
+        return equation
 
     def test(self):
         latex = r"""\textbf{Hi there!} Here is \emph{an equation
@@ -88,19 +95,20 @@ class EquationData:
                 stack_context = self.getStackContext(stack)
                 currentNode, remaining = self.buildNode(
                     nextNode, currentNode, remaining, stack_context)
-            
+
                 if currentNode.isOpeningDelimeter():
                     opened = True
                     continue
                 if currentNode.isClosingDelimiter():
                     opened = False
                     currentNode = self.buildGroup(opened_list)
+                    currentNode = self.buildContextNode(currentNode)
                     opened_list = []
                 if opened:
                     opened_list.append(nextNode)
                     continue
                 if currentNode.getTokenType() == TokenType.S_SPACE:
-                    continue    
+                    continue
                 if len(stack) > 0:
                     popStackAgain = True
                     while popStackAgain:
@@ -235,11 +243,9 @@ class EquationData:
 
         return result
 
-    def makeContextNode(self, leftDelimiter, middle, rightDelimiter):
+    def makeContextNode(self,  middle):
         node = Node(TokenType.T_CONTEXT)
-        node.addChild(LexicalRuleItem.K_LEFT, leftDelimiter)
         node.addChild(LexicalRuleItem.K_MIDDLE, middle)
-        node.addChild(LexicalRuleItem.K_RIGHT, rightDelimiter)
         return node
 
     def buildNode(self, node, previousNode=None, remainingText=None, stack_context=None):
@@ -247,11 +253,16 @@ class EquationData:
             self.lexicalBuilder = LexicalBuilder()
             self.lexicalBuilder.setEqBuilder(self)
         return self.lexicalBuilder.consume(node, previousNode, remainingText, stack_context)
+
     def buildGroup(self, nodelist):
         if self.lexicalBuilder == None:
             self.lexicalBuilder = LexicalBuilder()
             self.lexicalBuilder.setEqBuilder(self)
         return self.lexicalBuilder.buildGroup(nodelist)
+
+    def buildContextNode(self, node):
+        return self.makeContextNode(node)
+
     def printLatexNodes(self, text):
         print("print " + text)
         w = LatexWalker(text)
